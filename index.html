@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Schedule Optimizer • Gemini</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0f19; min-height: 100vh; color: #fff; overflow-x: hidden; }
+        
+        /* Градиентный фон */
+        .bg-gradient { position: fixed; border-radius: 50%; filter: blur(100px); z-index: -1; }
+        .bg-1 { width: 600px; height: 600px; background: linear-gradient(135deg, #4285f4 0%, #34a853 100%); top: -200px; left: -100px; opacity: 0.2; }
+        .bg-2 { width: 500px; height: 500px; background: linear-gradient(135deg, #fbbc04 0%, #ea4335 100%); bottom: -150px; right: -100px; opacity: 0.2; }
+        .bg-3 { width: 400px; height: 400px; background: linear-gradient(135deg, #4285f4 0%, #34a853 100%); top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.15; }
+        
+        /* Navbar */
+        .navbar { position: sticky; top: 0; z-index: 100; background: rgba(11,15,25,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 0 20px; }
+        .navbar-inner { max-width: 1500px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 60px; }
+        .nav-logo { font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .gemini-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); border-radius: 50%; }
+        .burger { display: flex; flex-direction: column; justify-content: center; gap: 5px; width: 36px; height: 36px; cursor: pointer; padding: 4px; border-radius: 8px; transition: background 0.2s; }
+        .burger:hover { background: rgba(255,255,255,0.08); }
+        .burger span { display: block; height: 2px; border-radius: 2px; background: rgba(255,255,255,0.8); transition: all 0.3s; }
+        .burger.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        .burger.active span:nth-child(2) { opacity: 0; }
+        .burger.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+        
+        /* Sidebar */
+        .sidebar-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .sidebar-overlay.open { opacity: 1; pointer-events: all; }
+        .sidebar { position: fixed; top: 0; right: -320px; bottom: 0; width: 320px; z-index: 201; background: rgba(15,20,35,0.98); backdrop-filter: blur(20px); border-left: 1px solid rgba(255,255,255,0.1); transition: right 0.35s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; }
+        .sidebar.open { right: 0; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 12px; }
+        .sidebar-header .gemini-icon { width: 40px; height: 40px; }
+        .sidebar-title { font-size: 1.1rem; font-weight: 700; }
+        .sidebar-close { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: rgba(255,255,255,0.5); font-size: 1.3rem; transition: all 0.2s; margin-left: auto; }
+        .sidebar-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .sidebar-nav { padding: 20px 16px; flex: 1; }
+        .sidebar-item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 12px; cursor: pointer; color: rgba(255,255,255,0.7); font-size: 0.95rem; transition: all 0.2s; margin-bottom: 8px; border: 1px solid transparent; }
+        .sidebar-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .sidebar-item.active { color: #fff; background: rgba(66,133,244,0.15); border-color: rgba(66,133,244,0.3); }
+        .sidebar-item .si-icon { font-size: 1.3rem; width: 28px; text-align: center; }
+        
+        .container { max-width: 1400px; margin: 0 auto; padding: 30px 20px; }
+        .page { display: none; }
+        .page.active { display: block; animation: fadeInUp 0.4s ease-out; }
+        
+        /* Schedule Page */
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { font-size: 2.5rem; background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc04 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
+        .subtitle { color: rgba(255,255,255,0.6); font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .gemini-badge { background: linear-gradient(135deg, #4285f4, #34a853); color: #fff; padding: 4px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; }
+        .legend-panel { display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 8px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .legend-text { font-size: 0.85rem; color: rgba(255,255,255,0.8); }
+        .selector-container { display: flex; justify-content: center; margin-bottom: 40px; }
+        .class-select { background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 12px 25px; font-size: 1.1rem; color: #fff; cursor: pointer; outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 20px; padding-right: 45px; min-width: 200px; transition: all 0.3s; }
+        .class-select:hover { border-color: rgba(66,133,244,0.6); box-shadow: 0 0 20px rgba(66,133,244,0.3); }
+        .class-select option { background: #1a1f2e; }
+        .schedule-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 15px; }
+        @media(max-width:1200px){ .schedule-grid { grid-template-columns: repeat(3,1fr); } }
+        @media(max-width:768px){ .schedule-grid { grid-template-columns: 1fr; } }
+        .day-card { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 20px 15px; animation: cardAppear 0.6s ease-out both; }
+        .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .day-name { font-size: 1.1rem; font-weight: 600; }
+        .day-badge { font-size: 0.6rem; padding: 4px 8px; border-radius: 20px; text-transform: uppercase; white-space: nowrap; }
+        .badge-entry { background: linear-gradient(135deg,#4facfe,#00f2fe); color: #0b0f19; }
+        .badge-peak { background: linear-gradient(135deg,#f093fb,#f5576c); color: #fff; }
+        .badge-relief { background: linear-gradient(135deg,#38ef7d,#11998e); color: #0b0f19; }
+        .badge-normal { background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); }
+        .lesson { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; margin-bottom: 8px; transition: all 0.3s; display: flex; justify-content: space-between; align-items: center; }
+        .lesson-content { display: flex; align-items: center; gap: 12px; }
+        .lesson-number { font-size: 0.75rem; color: rgba(255,255,255,0.4); width: 15px; }
+        .lesson-name { font-size: 0.9rem; font-weight: 500; }
+        .difficulty-indicator { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .diff-high { background: #ff6b6b; box-shadow: 0 0 8px rgba(255,107,107,0.5); }
+        .diff-med { background: #feca57; box-shadow: 0 0 8px rgba(254,202,87,0.5); }
+        .diff-low { background: #5cd85c; box-shadow: 0 0 8px rgba(92,216,92,0.5); }
+        
+        /* AI Page */
+        .ai-header { text-align: center; margin-bottom: 40px; }
+        .ai-header h2 { font-size: 2.2rem; background: linear-gradient(135deg, #4285f4, #34a853); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .ai-header p { color: rgba(255,255,255,0.5); font-size: 1rem; }
+        
+        .test-builder { max-width: 900px; margin: 0 auto; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 30px; }
+        .form-section { margin-bottom: 28px; }
+        .form-section-title { font-size: 0.85rem; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+        
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        @media(max-width:768px){ .form-row { grid-template-columns: 1fr; } }
+        
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 0.9rem; color: rgba(255,255,255,0.7); margin-bottom: 8px; font-weight: 500; }
+        .form-input, .form-select { width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 12px 16px; color: #fff; font-size: 0.95rem; font-family: inherit; outline: none; transition: all 0.2s; }
+        .form-input:focus, .form-select:focus { border-color: rgba(66,133,244,0.6); background: rgba(255,255,255,0.12); box-shadow: 0 0 0 3px rgba(66,133,244,0.1); }
+        .form-select option { background: #1a1f2e; }
+        .form-input::placeholder { color: rgba(255,255,255,0.3); }
+        
+        .subject-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .subject-chip { padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; cursor: pointer; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); transition: all 0.2s; text-align: center; font-weight: 500; }
+        .subject-chip:hover { border-color: rgba(66,133,244,0.4); background: rgba(66,133,244,0.08); color: #fff; }
+        .subject-chip.selected { background: linear-gradient(135deg, rgba(66,133,244,0.2), rgba(52,168,83,0.2)); border-color: rgba(66,133,244,0.6); color: #fff; box-shadow: 0 4px 12px rgba(66,133,244,0.3); }
+        
+        .question-types { display: flex; flex-direction: column; gap: 10px; }
+        .question-type-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: all 0.2s; }
+        .question-type-item:hover { border-color: rgba(66,133,244,0.4); background: rgba(66,133,244,0.08); }
+        .question-type-item.selected { background: linear-gradient(135deg, rgba(66,133,244,0.15), rgba(52,168,83,0.15)); border-color: rgba(66,133,244,0.6); box-shadow: 0 4px 12px rgba(66,133,244,0.2); }
+        .qt-checkbox { width: 20px; height: 20px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .question-type-item.selected .qt-checkbox { background: #4285f4; border-color: #4285f4; }
+        .qt-checkbox::after { content: '✓'; color: #fff; font-size: 14px; font-weight: bold; opacity: 0; }
+        .question-type-item.selected .qt-checkbox::after { opacity: 1; }
+        .qt-label { flex: 1; font-size: 0.95rem; color: rgba(255,255,255,0.8); }
+        .question-type-item.selected .qt-label { color: #fff; font-weight: 500; }
+        .qt-desc { font-size: 0.8rem; color: rgba(255,255,255,0.4); }
+        
+        /* Toggle */
+        .toggle-container { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: all 0.2s; }
+        .toggle-container:hover { border-color: rgba(66,133,244,0.4); background: rgba(66,133,244,0.08); }
+        .toggle-container.active { background: linear-gradient(135deg, rgba(66,133,244,0.15), rgba(52,168,83,0.15)); border-color: rgba(66,133,244,0.6); }
+        .toggle-label { flex: 1; font-size: 0.95rem; color: rgba(255,255,255,0.8); font-weight: 500; }
+        .toggle-container.active .toggle-label { color: #fff; }
+        .toggle-switch { width: 48px; height: 26px; background: rgba(255,255,255,0.15); border-radius: 13px; position: relative; transition: all 0.3s; }
+        .toggle-container.active .toggle-switch { background: #4285f4; }
+        .toggle-switch::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: all 0.3s; }
+        .toggle-container.active .toggle-switch::after { left: 25px; }
+        
+        .generate-btn { width: 100%; padding: 16px; border-radius: 14px; border: none; background: linear-gradient(135deg, #4285f4, #34a853); color: #fff; font-size: 1.05rem; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
+        .generate-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(66,133,244,0.4); }
+        .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+        .generate-btn.loading .btn-spinner { display: block; }
+        .generate-btn.loading .btn-text { display: none; }
+        
+        /* Result */
+        .result-container { max-width: 900px; margin: 40px auto 0; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 30px; display: none; animation: fadeInUp 0.4s ease-out; }
+        .result-container.show { display: block; }
+        .result-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .result-avatar { width: 48px; height: 48px; background: linear-gradient(135deg, #4285f4, #34a853, #fbbc04, #ea4335); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+        .result-info h3 { font-size: 1.1rem; margin-bottom: 4px; }
+        .result-info p { font-size: 0.85rem; color: rgba(255,255,255,0.5); }
+        .result-actions { margin-left: auto; display: flex; gap: 10px; }
+        .result-btn { padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .result-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .result-content { font-size: 0.95rem; line-height: 1.8; color: rgba(255,255,255,0.9); white-space: pre-wrap; word-break: break-word; }
+        
+        .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #4285f4, #34a853); color: #fff; padding: 14px 24px; border-radius: 12px; font-size: 0.9rem; font-weight: 500; z-index: 999; box-shadow: 0 8px 25px rgba(66,133,244,0.4); transform: translateY(100px); opacity: 0; transition: all 0.4s cubic-bezier(.4,0,.2,1); }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        
+        footer { text-align: center; margin-top: 60px; padding: 20px; color: rgba(255,255,255,0.3); font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.05); }
+        footer span { background: linear-gradient(135deg, #4285f4, #34a853); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        /* Print Styles */
+        @media print {
+            body { background: #fff; color: #000; }
+            .bg-gradient, .navbar, .sidebar, .sidebar-overlay, .test-builder, .result-header, .toast, footer { display: none !important; }
+            .result-container { max-width: 100%; margin: 0; padding: 20px; background: #fff; border: none; display: block !important; }
+            .result-content { color: #000; font-size: 12pt; line-height: 1.6; }
+            @page { margin: 2cm; }
+        }
+        
+        @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes cardAppear { from{opacity:0;transform:translateY(40px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .schedule-grid.updating .day-card { animation: cardAppear 0.5s ease-out both; }
+    </style>
+</head>
+<body>
+<div class="bg-gradient bg-1"></div>
+<div class="bg-gradient bg-2"></div>
+<div class="bg-gradient bg-3"></div>
+<div class="toast" id="toast"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="navbar-inner">
+        <div class="nav-logo">
+            <div class="gemini-icon"></div>
+            <span>AI Schedule</span>
+        </div>
+        <div class="burger" id="burgerBtn">
+            <span></span><span></span><span></span>
+        </div>
+    </div>
+</nav>
+
+<!-- SIDEBAR -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="gemini-icon"></div>
+        <div class="sidebar-title">Меню</div>
+        <div class="sidebar-close" id="sidebarClose">✕</div>
+    </div>
+    <div class="sidebar-nav">
+        <div class="sidebar-item active" data-page="schedule">
+            <span class="si-icon">📅</span>
+            <div>
+                <div style="font-size:.95rem;font-weight:500">Расписание</div>
+                <div style="font-size:.75rem;color:rgba(255,255,255,.4);margin-top:2px">Просмотр занятий</div>
+            </div>
+        </div>
+        <div class="sidebar-item" data-page="ai">
+            <span class="si-icon">✨</span>
+            <div>
+                <div style="font-size:.95rem;font-weight:500">Генератор тестов</div>
+                <div style="font-size:.75rem;color:rgba(255,255,255,.4);margin-top:2px">Создание с Gemini AI</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- SCHEDULE PAGE -->
+    <div class="page active" id="page-schedule">
+        <header>
+            <h1>✨ AI Schedule Optimizer</h1>
+            <p class="subtitle"><span class="gemini-badge">Gemini AI</span> Умное расписание для школы</p>
+        </header>
+        <div class="legend-panel">
+            <div class="legend-item"><div class="legend-dot diff-high"></div><span class="legend-text">Сложно (точные науки)</span></div>
+            <div class="legend-item"><div class="legend-dot diff-med"></div><span class="legend-text">Средне (гуманитарные)</span></div>
+            <div class="legend-item"><div class="legend-dot diff-low"></div><span class="legend-text">Легко (творчество / спорт)</span></div>
+        </div>
+        <div class="selector-container">
+            <select class="class-select" id="classSelect"></select>
+        </div>
+        <div class="schedule-grid" id="scheduleGrid"></div>
+        <footer>Сгенерировано с помощью <span>Gemini AI</span> • Соответствует нормам СанПиН 2.4.2.2821-10</footer>
+    </div>
+
+    <!-- AI PAGE -->
+    <div class="page" id="page-ai">
+        <div class="ai-header">
+            <h2><div class="gemini-icon" style="width:44px;height:44px"></div> Генератор тестов Gemini</h2>
+            <p>Создай тест по любому предмету с помощью искусственного интеллекта Google Gemini</p>
+        </div>
+
+        <!-- TEST BUILDER -->
+        <div class="test-builder">
+            <!-- Предмет и класс -->
+            <div class="form-section">
+                <div class="form-section-title">📚 Основные параметры</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Класс</label>
+                        <select class="form-select" id="gradeSelect">
+                            <option value="">Выбери класс</option>
+                            <option value="1">1 класс</option>
+                            <option value="2">2 класс</option>
+                            <option value="3">3 класс</option>
+                            <option value="4">4 класс</option>
+                            <option value="5">5 класс</option>
+                            <option value="6">6 класс</option>
+                            <option value="7">7 класс</option>
+                            <option value="8">8 класс</option>
+                            <option value="9">9 класс</option>
+                            <option value="10">10 класс</option>
+                            <option value="11">11 класс</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Тема урока</label>
+                        <input type="text" class="form-input" id="topicInput" placeholder="Например: Квадратные уравнения">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Предмет -->
+            <div class="form-section">
+                <div class="form-section-title">📖 Предмет</div>
+                <div class="subject-grid" id="subjectGrid"></div>
+            </div>
+
+            <!-- Количество заданий и вариантов -->
+            <div class="form-section">
+                <div class="form-section-title">📝 Параметры теста</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Количество заданий</label>
+                        <input type="number" class="form-input" id="taskCount" min="1" max="50" value="10" placeholder="Введи число">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Количество вариантов</label>
+                        <input type="number" class="form-input" id="variantCount" min="1" max="10" value="1" placeholder="Введи число">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Типы вопросов -->
+            <div class="form-section">
+                <div class="form-section-title">🎯 Типы заданий (выбери нужные)</div>
+                <div class="question-types">
+                    <div class="question-type-item" data-type="choice1">
+                        <div class="qt-checkbox"></div>
+                        <div style="flex:1">
+                            <div class="qt-label">1 правильный ответ из 4</div>
+                            <div class="qt-desc">Тест с выбором одного варианта (A, B, C, D)</div>
+                        </div>
+                    </div>
+                    <div class="question-type-item" data-type="choice2">
+                        <div class="qt-checkbox"></div>
+                        <div style="flex:1">
+                            <div class="qt-label">2 правильных из 5</div>
+                            <div class="qt-desc">Множественный выбор (A, B, C, D, E)</div>
+                        </div>
+                    </div>
+                    <div class="question-type-item" data-type="matching">
+                        <div class="qt-checkbox"></div>
+                        <div style="flex:1">
+                            <div class="qt-label">Соотнесение (A-1, B-2)</div>
+                            <div class="qt-desc">Сопоставить элементы двух колонок</div>
+                        </div>
+                    </div>
+                    <div class="question-type-item" data-type="open">
+                        <div class="qt-checkbox"></div>
+                        <div style="flex:1">
+                            <div class="qt-label">Развёрнутый ответ</div>
+                            <div class="qt-desc">Задание требует подробного объяснения</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Добавить ответы -->
+            <div class="form-section">
+                <div class="form-section-title">🔑 Ответы</div>
+                <div class="toggle-container" id="answersToggle">
+                    <div class="toggle-label">Добавить ответы к тесту</div>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+
+            <button class="generate-btn" id="generateBtn">
+                <div class="btn-spinner"></div>
+                <span class="btn-text">✨ Сгенерировать тест с Gemini</span>
+            </button>
+        </div>
+
+        <!-- RESULT -->
+        <div class="result-container" id="resultContainer">
+            <div class="result-header">
+                <div class="result-avatar">✨</div>
+                <div class="result-info">
+                    <h3>Gemini AI</h3>
+                    <p id="resultSubtitle">Тест успешно сгенерирован</p>
+                </div>
+                <div class="result-actions">
+                    <button class="result-btn" id="copyResult">📋 Копировать</button>
+                    <button class="result-btn" id="downloadResult">💾 Скачать</button>
+                    <button class="result-btn" id="printResult">🖨 Печать</button>
+                </div>
+            </div>
+            <div class="result-content" id="resultContent"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ================================================================
+//  SCHEDULE DATA
+// ================================================================
+const FULL_SCHEDULE = {
+"1А":[["Литер.чтение","Русский язык","Математика","Мз"],["Математика","Русский язык","Литер.чтение","Фз","ИЗ"],["Русский язык","Математика","Литер.чтение","Тх"],["Литер.чтение","Русский язык","Математика","Ок"],["Русский язык","Литер.чтение","Математика","Фз"]],
+"1Б":[["Литер.чтение","Русский язык","Математика","ИЗ"],["Русский язык","Математика","Фз","Мз","Ок"],["Русский язык","Литер.чтение","Математика","Тх"],["Математика","Литер.чтение","Русский язык","Фз"],["Литер.чтение","Математика","Русский язык","Ок"]],
+"2А":[["Русский язык","Математика","Литер.чтение","Тх"],["Математика","Русский язык","Английский","ИЗ","Мз"],["Литер.чтение","Математика","Русский язык","Фз"],["Русский язык","Литер.чтение","Математика","Ок"],["Английский","Литер.чтение","Математика","Фз"]],
+"2Б":[["Математика","Русский язык","Литер.чтение","Мз"],["Русский язык","Математика","Английский","Фз","Ок"],["Литер.чтение","Математика","Русский язык","ИЗ"],["Математика","Русский язык","Литер.чтение","Тх"],["Английский","Литер.чтение","Русский язык","Фз"]],
+"3А":[["Литер.чтение","Русский язык","Математика","Ок","Фз"],["Математика","Русский язык","Английский","Мз"],["Русский язык","Литер.чтение","Математика","ИЗ","Тх"],["Математика","Литер.чтение","Русский язык","Фз"],["Английский","Математика","Русский язык","Литер.чтение"]],
+"3Б":[["Русский язык","Литер.чтение","Математика","Тх","Ок"],["Математика","Русский язык","Английский","Фз"],["Литер.чтение","Русский язык","Математика","Мз","ИЗ"],["Математика","Литер.чтение","Русский язык","Ок"],["Русский язык","Английский","Литер.чтение","Фз","Математика"]],
+"4А":[["Русский язык","Математика","Литер.чтение","Мз","ИЗ"],["Математика","Русский язык","Об","Фз","Тх"],["Литер.чтение","Математика","Русский язык","ОБ","Фз"],["Русский язык","Литер.чтение","Математика","Об"],["Математика","Английский","Литер.чтение","Русский язык"]],
+"4Б":[["Математика","Русский язык","Литер.чтение","Тх","Мз"],["Русский язык","Математика","Английский","ИЗ","Фз"],["Литер.чтение","Математика","Русский язык","ОБ","Ок"],["Математика","Русский язык","Литер.чтение","Фз"],["Английский","Литер.чтение","Русский язык","Математика"]],
+"5А":[["Русский язык","Математика","Английский","Ис","ИЗ","Фз"],["Литература","Математика","Русский язык","Мз","Би","Ге"],["Математика","Русский язык","Английский","Тх","Литература","Ис"],["Русский язык","Математика","Фз","Ис","Би","ОБ"],["Ге","Английский","Математика","Русский язык","Мз","Литература"]],
+"5Б":[["Математика","Русский язык","Ге","Английский","Фз","Ис"],["Русский язык","Математика","Литература","Мз","Би","Ис"],["Литература","Математика","Русский язык","Английский","Тх","Ис"],["Математика","Русский язык","Фз","Ге","Би","ОБ"],["Английский","Литература","Русский язык","Математика","ИЗ","Фз"]],
+"6А":[["Русский язык","Математика","Би","Литература","Английский","Об"],["Математика","Русский язык","Ис","Ге","Мз","Фз"],["Литература","Математика","Русский язык","Тх","Английский","ИЗ"],["Русский язык","Математика","Фз","Ис","Ге","ОБ"],["Английский","Литература","Русский язык","Об","Математика","Фз"]],
+"6Б":[["Математика","Русский язык","Литература","Английский","Ге","Ис"],["Русский язык","Математика","Би","Ис","ИЗ","Об"],["Математика","Литература","Русский язык","Мз","Английский","Тх"],["Русский язык","Математика","Ис","Фз","Би","ОБ"],["Литература","Английский","Русский язык","Математика","Об","Фз"]],
+"7А":[["Алгебра","Русский язык","Ис","Английский","Ге","Би","Фз"],["Геометрия","Литература","Об","Мз","Русский язык","Фи","ИЗ"],["Русский язык","Алгебра","Английский","Ин","Тх","Фи","ОБ"],["Литература","Геометрия","Русский язык","Би","Ге","Ис"],["Алгебра","Русский язык","Литература","Английский","Ге","Об"]],
+"7Б":[["Фз","Алгебра","Ге","Би","Английский","Мз","Русский язык"],["Алгебра","Русский язык","Фи","Ис","Об","ИЗ","Ге"],["Литература","Геометрия","Русский язык","Ин","Би","Ис","Тх"],["Русский язык","Алгебра","Фи","Английский","Литература","ОБ"],["Геометрия","Об","Алгебра","Английский","Фи","Фз"]],
+"8А":[["Алгебра","Русский язык","Хи","Ис","Английский","Би","ОБ"],["Геометрия","Литература","Фи","Об","Ге","Ин","Тх"],["Русский язык","Алгебра","Хи","Английский","Об","Ис","Би"],["Литература","Геометрия","Русский язык","Фи","Ге","Фз","Алгебра"],["Алгебра","Русский язык","Литература","Английский","Ин","Ге"]],
+"8Б":[["Русский язык","Алгебра","Ис","Хи","Английский","Тх","Фз"],["Алгебра","Русский язык","Ге","Фи","Би","Ин","ОБ"],["Геометрия","Литература","Английский","Хи","Об","Ис","Ге"],["Русский язык","Алгебра","Фи","Би","Литература","Геометрия","Фз"],["Литература","Алгебра","Русский язык","Английский","Об","Ин"]],
+"9А":[["Алгебра","Русский язык","Фи","Ис","Английский","Хи","Фз"],["Геометрия","Литература","Би","Ге","Об","Ин","ОБ"],["Русский язык","Алгебра","Хи","Английский","Фи","Ис","Тх"],["Литература","Геометрия","Русский язык","Би","Ге","Об","Ин"],["Алгебра","Русский язык","Литература","Английский","Родной язык","Фи","Фз"]],
+"9Б":[["Русский язык","Геометрия","Хи","Фи","Английский","Ис","ОБ"],["Алгебра","Литература","Ге","Би","Ин","Об","Фз"],["Геометрия","Русский язык","Английский","Ис","Хи","Тх","Фи"],["Русский язык","Алгебра","Би","Ге","Ин","Литература","Об"],["Геометрия","Литература","Об","Фи","Родной язык","Алгебра","Хи"]],
+"10":[["Алгебра","Русский язык","Ин","Хи","Ис","Английский","Би"],["Геометрия","Литература","Фи","Об","Ге","Ин","ОБ"],["Русский язык","Алгебра","Фи","Хи","Английский","Ис","Литература"],["Литература","Геометрия","Би","Об","Ге","Фз","Английский"],["Алгебра","Русский язык","Английский","Ге","Хи","Родной язык","Фз"]],
+"11":[["Фи","Хи","Алгебра","Русский язык","Об","Ин","Английский"],["Би","Ис","Геометрия","Литература","Фз","ОБ","Ге"],["Ин","Би","Русский язык","Алгебра","Литература","Ис","Фи"],["Хи","Фи","Об","Геометрия","Английский","Родной язык","Фз"],["Ге","Литература","Алгебра","Русский язык","Би","Ин","Об"]]
+};
+
+const expand={"Фз":"Физкультура","Фи":"Физика","Хи":"Химия","Би":"Биология","Ис":"История","Ге":"География","Об":"Обществознание","Ин":"Информатика","ИЗ":"ИЗО","Мз":"Музыка","Тх":"Технология","ОБ":"ОБЗР","Ок":"Окр. мир"};
+for(const cls in FULL_SCHEDULE){ FULL_SCHEDULE[cls]=FULL_SCHEDULE[cls].map(day=>day.map(s=>expand[s]||s)); }
+
+const daysInfo=[
+    {name:"Понедельник",badge:"entry",text:"Вход в неделю"},
+    {name:"Вторник",badge:"peak",text:"Пиковая нагрузка"},
+    {name:"Среда",badge:"peak",text:"Пиковая нагрузка"},
+    {name:"Четверг",badge:"normal",text:"Обычный день"},
+    {name:"Пятница",badge:"relief",text:"Разгрузочный день"}
+];
+const getDiff=s=>{
+    if(["Алгебра","Геометрия","Физика","Химия","Информатика","Математика"].includes(s))return"high";
+    if(["Физкультура","ИЗО","Музыка","Технология","ОБЗР","Окр. мир"].includes(s))return"low";
+    return"med";
+};
+const orderedClasses=["1А","1Б","2А","2Б","3А","3Б","4А","4Б","5А","5Б","6А","6Б","7А","7Б","8А","8Б","9А","9Б","10","11"];
+
+const renderSchedule=cls=>{
+    const grid=document.getElementById('scheduleGrid');
+    grid.classList.add('updating');
+    grid.innerHTML="";
+    (FULL_SCHEDULE[cls]||[]).forEach((lessons,di)=>{
+        const d=daysInfo[di];
+        let h=`<div class="day-card"><div class="day-header"><span class="day-name">${d.name}</span><span class="day-badge badge-${d.badge}">${d.text}</span></div>`;
+        lessons.forEach((s,li)=>{
+            const df=getDiff(s);
+            h+=`<div class="lesson"><div class="lesson-content"><span class="lesson-number">${li+1}</span><span class="lesson-name">${s}</span></div><div class="difficulty-indicator diff-${df}"></div></div>`;
+        });
+        grid.innerHTML+=h+`</div>`;
+    });
+    setTimeout(()=>grid.classList.remove('updating'),300);
+};
+
+// NAVIGATION
+function switchPage(id){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));
+    document.getElementById('page-'+id).classList.add('active');
+    document.querySelectorAll(`[data-page="${id}"]`).forEach(el=>el.classList.add('active'));
+    closeSidebar();
+}
+document.querySelectorAll('.sidebar-item').forEach(t=>t.addEventListener('click',()=>switchPage(t.dataset.page)));
+
+const sidebar=document.getElementById('sidebar');
+const overlay=document.getElementById('sidebarOverlay');
+const burger=document.getElementById('burgerBtn');
+function openSidebar(){sidebar.classList.add('open');overlay.classList.add('open');burger.classList.add('active');}
+function closeSidebar(){sidebar.classList.remove('open');overlay.classList.remove('open');burger.classList.remove('active');}
+burger.addEventListener('click',()=>sidebar.classList.contains('open')?closeSidebar():openSidebar());
+overlay.addEventListener('click',closeSidebar);
+document.getElementById('sidebarClose').addEventListener('click',closeSidebar);
+
+// SCHEDULE INIT
+document.addEventListener('DOMContentLoaded',()=>{
+    const sel=document.getElementById('classSelect');
+    orderedClasses.forEach(c=>{
+        if(FULL_SCHEDULE[c]){
+            const o=document.createElement('option');
+            o.value=c;
+            o.textContent=isNaN(c[0])?c:c+" класс";
+            if(c==="7А")o.selected=true;
+            sel.appendChild(o);
+        }
+    });
+    renderSchedule("7А");
+    sel.addEventListener('change',e=>renderSchedule(e.target.value));
+});
+
+// ================================================================
+//  AI TEST GENERATOR
+// ================================================================
+const API_URL = 'https://groq-ai-bot-raj1.onrender.com/generate';
+
+const SUBJECTS = {
+    'Математика': 1,
+    'Русский язык': 1,
+    'Литературное чтение': 1,
+    'Литература': 5,
+    'Английский язык': 2,
+    'Окружающий мир': 1,
+    'История': 5,
+    'Обществознание': 6,
+    'География': 5,
+    'Биология': 5,
+    'Физика': 7,
+    'Химия': 8,
+    'Информатика': 5,
+    'Физкультура': 1,
+    'ИЗО': 1,
+    'Музыка': 1,
+    'Технология': 1,
+    'ОБЗР': 1
+};
+
+let selectedSubject = '';
+let selectedTypes = new Set();
+let includeAnswers = true; // По умолчанию включено
+
+// Заполнение предметов
+const subjectGrid = document.getElementById('subjectGrid');
+Object.keys(SUBJECTS).forEach(subject=>{
+    const chip = document.createElement('div');
+    chip.className = 'subject-chip';
+    chip.textContent = subject;
+    chip.dataset.subject = subject;
+    chip.addEventListener('click',()=>{
+        document.querySelectorAll('.subject-chip').forEach(c=>c.classList.remove('selected'));
+        chip.classList.add('selected');
+        selectedSubject = subject;
+        validateForm();
+    });
+    subjectGrid.appendChild(chip);
+});
+
+// Типы вопросов
+document.querySelectorAll('.question-type-item').forEach(item=>{
+    item.addEventListener('click',()=>{
+        const type = item.dataset.type;
+        if(selectedTypes.has(type)){
+            selectedTypes.delete(type);
+            item.classList.remove('selected');
+        } else {
+            selectedTypes.add(type);
+            item.classList.add('selected');
+        }
+        validateForm();
+    });
+});
+
+// Toggle ответов
+const answersToggle = document.getElementById('answersToggle');
+answersToggle.classList.add('active'); // Включено по умолчанию
+answersToggle.addEventListener('click',()=>{
+    includeAnswers = !includeAnswers;
+    answersToggle.classList.toggle('active');
+});
+
+// Валидация
+const gradeSelect = document.getElementById('gradeSelect');
+gradeSelect.addEventListener('change', validateForm);
+
+function validateForm(){
+    const grade = parseInt(gradeSelect.value);
+    if(!grade || !selectedSubject) return;
+    const minGrade = SUBJECTS[selectedSubject];
+    if(grade < minGrade){
+        showToast(`⚠️ ${selectedSubject} изучается с ${minGrade} класса`);
+        gradeSelect.value = minGrade;
+    }
+}
+
+// Toast
+function showToast(msg){
+    const t=document.getElementById('toast');
+    t.textContent=msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// Генерация
+document.getElementById('generateBtn').addEventListener('click', async ()=>{
+    const grade = gradeSelect.value;
+    const topic = document.getElementById('topicInput').value.trim();
+    const taskCount = document.getElementById('taskCount').value;
+    const variantCount = document.getElementById('variantCount').value;
+    
+    if(!grade){ showToast('⚠️ Выбери класс'); return; }
+    if(!selectedSubject){ showToast('⚠️ Выбери предмет'); return; }
+    if(!topic){ showToast('⚠️ Введи тему урока'); return; }
+    if(!taskCount || taskCount<1){ showToast('⚠️ Укажи количество заданий'); return; }
+    if(selectedTypes.size===0){ showToast('⚠️ Выбери хотя бы один тип заданий'); return; }
+    
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    showToast('⏳ Генерирую тест... Это займёт 10-30 секунд');
+    
+    try {
+        const typesDesc = Array.from(selectedTypes).map(t=>{
+            if(t==='choice1') return 'тест с одним правильным ответом из 4 вариантов (формат: вопрос, варианты A) B) C) D))';
+            if(t==='choice2') return 'тест с двумя правильными ответами из 5 вариантов (формат: вопрос, варианты A) B) C) D) E))';
+            if(t==='matching') return 'задание на соотнесение элементов (формат: левый столбец A, B, C... и правый столбец 1, 2, 3...)';
+            if(t==='open') return 'задание с развёрнутым ответом';
+        }).join('; ');
+        
+        let prompt = `Составь тест для учителя по предмету «${selectedSubject}» для ${grade} класса.\n`;
+        prompt += `Тема: «${topic}».\n`;
+        prompt += `Количество заданий: ${taskCount}.\n`;
+        prompt += `${variantCount > 1 ? `Количество вариантов: ${variantCount}.\n` : ''}`;
+        prompt += `Типы заданий (используй СТРОГО ТОЛЬКО эти типы): ${typesDesc}.\n\n`;
+        
+        prompt += `КРИТИЧЕСКИ ВАЖНО:\n`;
+        prompt += `— Используй ТОЛЬКО те типы заданий которые я указал выше\n`;
+        prompt += `— НЕ добавляй другие типы заданий которых нет в списке\n`;
+        prompt += `— Распределяй задания по типам равномерно\n`;
+        if(selectedTypes.has('choice1')) {
+            prompt += `— Для заданий "1 правильный из 4": ОБЯЗАТЕЛЬНО 4 варианта (A, B, C, D), только ОДИН правильный\n`;
+        }
+        if(selectedTypes.has('choice2')) {
+            prompt += `— Для заданий "2 правильных из 5": ОБЯЗАТЕЛЬНО 5 вариантов (A, B, C, D, E), ровно ДВА правильных\n`;
+        }
+        if(selectedTypes.has('matching')) {
+            prompt += `— Для соотнесения: левый столбец (А, Б, В...), правый столбец (1, 2, 3...)\n`;
+        }
+        if(variantCount > 1) {
+            prompt += `— Создай ${variantCount} полноценных варианта теста с разными заданиями\n`;
+        }
+        
+        if(includeAnswers) {
+            prompt += `— В конце ОБЯЗАТЕЛЬНО добавь раздел "КЛЮЧИ" или "ОТВЕТЫ" с правильными ответами для всех заданий\n`;
+            if(selectedTypes.has('choice1') || selectedTypes.has('choice2')) {
+                prompt += `— В ключах укажи номер задания и правильную букву (например: 1-B, 2-A и т.д.)\n`;
+            }
+            if(selectedTypes.has('matching')) {
+                prompt += `— Для соотнесения в ключах покажи правильные пары (например: А-2, Б-1, В-3)\n`;
+            }
+            if(variantCount > 1) {
+                prompt += `— Ответы группируй по вариантам (Вариант 1: ответы..., Вариант 2: ответы...)\n`;
+            }
+        } else {
+            prompt += `— НЕ добавляй ответы и ключи к заданиям\n`;
+        }
+        
+        prompt += `— Задания должны соответствовать ФГОС и возрасту ${grade} класса\n`;
+        prompt += `— Оформи чётко с нумерацией\n\n`;
+        prompt += `Начни ответ с: "Привет! Я нейросеть Gemini. Я сгенерировала для вас тест по предмету «${selectedSubject}» для ${grade} класса на тему «${topic}». Вот что получилось:"\n\n`;
+        prompt += `Затем сразу начинай тест.`;
+        
+        const messages = [
+            {role: 'system', content: 'Ты — профессиональный педагогический ассистент Gemini от Google. Помогаешь учителям создавать качественные тесты. Всегда начинаешь ответ с приветствия от имени Gemini. СТРОГО следуй указанным типам заданий и НЕ добавляй лишние.'},
+            {role: 'user', content: prompt}
+        ];
+        
+        console.log('📤 Отправка запроса...');
+        
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: messages })
+        });
+        
+        if(!res.ok){
+            throw new Error(`Ошибка сервера: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        const result = data.choices?.[0]?.message?.content || '(пустой ответ)';
+        
+        console.log('✅ Ответ получен');
+        
+        // Показываем результат
+        const resultContainer = document.getElementById('resultContainer');
+        const resultContent = document.getElementById('resultContent');
+        const resultSubtitle = document.getElementById('resultSubtitle');
+        
+        const typesText = Array.from(selectedTypes).map(t=>{
+            if(t==='choice1') return '1 из 4';
+            if(t==='choice2') return '2 из 5';
+            if(t==='matching') return 'Соотнесение';
+            if(t==='open') return 'Развёрнутый';
+        }).join(', ');
+        
+        resultSubtitle.textContent = `${selectedSubject}, ${grade} класс • ${taskCount} ${taskCount==1?'задание':taskCount<5?'задания':'заданий'} • Типы: ${typesText}${variantCount>1?' • '+variantCount+' вар.':''}${includeAnswers?' • С ответами':''}`;
+        resultContent.textContent = result;
+        resultContainer.classList.add('show');
+        resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        showToast('✅ Тест успешно сгенерирован!');
+        
+    } catch(error) {
+        console.error('❌ Ошибка:', error);
+        showToast('❌ Ошибка генерации: ' + error.message);
+    }
+    
+    btn.disabled = false;
+    btn.classList.remove('loading');
+});
+
+// Копирование
+document.getElementById('copyResult').addEventListener('click',()=>{
+    const text = document.getElementById('resultContent').textContent;
+    navigator.clipboard.writeText(text).then(()=>{
+        showToast('📋 Тест скопирован!');
+    }).catch(()=>{
+        showToast('❌ Не удалось скопировать');
+    });
+});
+
+// Скачивание DOCX
+document.getElementById('downloadResult').addEventListener('click',()=>{
+    const text = document.getElementById('resultContent').textContent;
+    const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `test_${selectedSubject}_${gradeSelect.value}kl_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('💾 Тест сохранён!');
+});
+
+// Печать
+document.getElementById('printResult').addEventListener('click',()=>{
+    window.print();
+    showToast('🖨 Открыто окно печати');
+});
+</script>
+</body>
+</html>
